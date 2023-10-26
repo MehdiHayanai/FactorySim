@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+import glob
 
 # Informations sur les produits
 producs_info = [
@@ -7,25 +8,33 @@ producs_info = [
         "name": "Barre de silicium",
         "unit_price": 150,
         "delai": 4,
-        "security_stock": 1000,
+        "security_stock": 2000,
+        "EC": 4000,
+        "PC": 2000,
     },
     {
         "name": "kit laminage",
         "unit_price": 70,
         "delai": 4,
-        "security_stock": 1000,
+        "security_stock": 2000,
+        "EC": 5000,
+        "PC": 2000,
     },
     {
         "name": "Kit électronique",
         "unit_price": 50,
         "delai": 6,
-        "security_stock": 2000,
+        "security_stock": 3250,
+        "EC": 6000,
+        "PC": 3250,
     },
     {
         "name": "Structure",
         "unit_price": 20,
         "delai": 6,
-        "security_stock": 2000,
+        "security_stock": 3250,
+        "EC": 8250,
+        "PC": 3250,
     },
 ]
 
@@ -102,3 +111,80 @@ def calculate_economique_size_based_on_n_observation(
     Qe = np.sqrt(2 * order_fee * total_quantity / (unit_price * taux_stockage))
 
     return Qe, Qe * unit_price
+
+
+def clear_history_text(x):
+    """Clear text from history dataframe row
+    Args:
+        x (str): text to clear
+    Returns:
+        x (str): cleared text
+    """
+    x = str(x)
+    if "€" in x:
+        x = (
+            x.replace(" ", "")
+            .replace("€", "")
+            .replace("$", "")
+            .replace(",", ".")
+            .replace("\xa0", "")
+        )
+    else:
+        x = (
+            x.replace(" ", "")
+            .replace("€", "")
+            .replace("$", "")
+            .replace(",", "")
+            .replace("\xa0", "")
+        )
+
+    # print(x)
+    if "(" in x:
+        x = x.replace(" ", "")
+        x = x.replace("(", "").replace(")", "")
+        x = "-" + str(x)
+    else:
+        x = x.replace(" ", "")
+        x = str(x)
+    return x
+
+
+def make_history_df(team_name: str = "Serious team", path: str = "data/history/*.csv"):
+    """Make history dataframe from csv files
+    Args:
+        team_name (str, optional): team name. Defaults to "Serious team".
+        path (str, optional): path to csv files. Defaults to "data/history/*.csv".
+    Returns:
+        team_data (pd.DataFrame): team data
+    """
+    history_data = glob.glob(path)
+    dataframes = []
+
+    for csv in history_data:
+        df = pd.read_csv(csv, index_col=0)
+        df["model"] = int(
+            csv.split("\\")[-1]
+            .split(".")[0]
+            .replace("ranking", "")
+            .replace("-missing", "")
+        )
+        dataframes.append(df)
+
+    df = pd.concat(dataframes)
+    team_data = df[df["Team"] == team_name].copy()
+
+    team_data["Cash"] = (
+        team_data["Cash"].apply(lambda x: clear_history_text(x)).astype(float)
+    )
+    team_data.sort_values(by=["model"], inplace=True, ascending=True)
+
+    team_data["Cash_diff"] = team_data["Cash"].diff()
+    team_data["Orders_diff"] = team_data["Orders Out"].diff()
+    team_data["Net_gain"] = (
+        team_data["Cash_diff"] / team_data["Orders_diff"] - 2900
+    ) * team_data["Orders_diff"]
+    team_data["Positive_net_gain"] = team_data["Net_gain"].apply(
+        lambda x: x if x > 0 else 0
+    )
+
+    return team_data
