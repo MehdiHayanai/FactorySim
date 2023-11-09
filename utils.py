@@ -9,7 +9,7 @@ producs_info = [
         "unit_price": 150,
         "delai": 4,
         "security_stock": 2000,
-        "EC": 4000,
+        "EC": 5000,
         "PC": 2000,
     },
     {
@@ -24,17 +24,17 @@ producs_info = [
         "name": "Kit électronique",
         "unit_price": 50,
         "delai": 6,
-        "security_stock": 3250,
+        "security_stock": 3500,
         "EC": 6000,
-        "PC": 3250,
+        "PC": 3500,
     },
     {
         "name": "Structure",
         "unit_price": 20,
         "delai": 6,
-        "security_stock": 3250,
+        "security_stock": 3500,
         "EC": 8250,
-        "PC": 3250,
+        "PC": 3500,
     },
 ]
 
@@ -53,9 +53,10 @@ def weighted_moving_average_rate(
     window: int = 3,
     column: str = "Demand",
     security_rate: float = 1.0,
+    func: callable = lambda window: -np.log(np.arange(1, window + 1) * (1 / window)),
 ) -> pd.DataFrame:
     """Calcule la moyenne mobile pondérée et le taux de croissance"""
-    weights = np.exp(np.arange(1, window + 1) * (1 / window))
+    weights = func(window)
     weights = weights / weights.sum()
     df["WMA"] = (
         df[column].rolling(window=window).apply(lambda x: np.dot(x, weights))
@@ -70,9 +71,10 @@ def predict_demande_using_weighted_moving_average(
     window: int = 3,
     column: str = "Demand",
     security_rate: float = 1.0,
+    func: callable = lambda window: -np.log(np.arange(1, window + 1) * (1 / window)),
 ) -> pd.DataFrame:
     """Prédit la demande en utilisant la moyenne mobile pondérée"""
-    weights = np.exp(np.arange(1, window + 1) * (1 / window))
+    weights = func(window)
     weights = weights / weights.sum()
     df["WMA"] = (
         df[column].rolling(window=window).apply(lambda x: np.dot(x, weights))
@@ -90,7 +92,7 @@ def forcast_n_nexth_days(
     last_known_value = df.iloc[-1][method]
     forcast = []
 
-    for i in range(forcast_n):
+    for _ in range(forcast_n):
         forcast_value = last_known_value * (1 + df.iloc[-1][f"GR_{method}"])
         forcast.append(forcast_value)
         last_known_value = forcast_value
@@ -129,7 +131,7 @@ def clear_history_text(x):
             .replace(",", ".")
             .replace("\xa0", "")
         )
-    else:
+    elif "$" in x:
         x = (
             x.replace(" ", "")
             .replace("€", "")
@@ -138,7 +140,6 @@ def clear_history_text(x):
             .replace("\xa0", "")
         )
 
-    # print(x)
     if "(" in x:
         x = x.replace(" ", "")
         x = x.replace("(", "").replace(")", "")
@@ -149,7 +150,11 @@ def clear_history_text(x):
     return x
 
 
-def make_history_df(team_name: str = "Serious team", path: str = "data/history/*.csv"):
+def make_history_df(
+    Selling_price: pd.Series,
+    team_name: str = "Serious team",
+    path: str = "data/history/*.csv",
+):
     """Make history dataframe from csv files
     Args:
         team_name (str, optional): team name. Defaults to "Serious team".
@@ -180,11 +185,13 @@ def make_history_df(team_name: str = "Serious team", path: str = "data/history/*
 
     team_data["Cash_diff"] = team_data["Cash"].diff()
     team_data["Orders_diff"] = team_data["Orders Out"].diff()
-    team_data["Net_gain"] = (
-        team_data["Cash_diff"] / team_data["Orders_diff"] - 2900
-    ) * team_data["Orders_diff"]
+    team_data["Selling_price"] = Selling_price
+    team_data["Net_gain"] = (team_data["Selling_price"] - 2900) * team_data[
+        "Orders_diff"
+    ]
     team_data["Positive_net_gain"] = team_data["Net_gain"].apply(
         lambda x: x if x > 0 else 0
     )
+    team_data["team"] = team_name
 
     return team_data

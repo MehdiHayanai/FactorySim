@@ -1,3 +1,6 @@
 *.zip
 __pycache__/
 to_send/
+.env
+ids/
+data/extended/
